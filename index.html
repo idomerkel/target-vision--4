@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Smart Target - Triple Analytics & Scrub Wheel</title>
+    <title>Smart Target - Advanced Deduction Engine</title>
     
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
@@ -16,7 +16,7 @@
         video, canvas.overlay { position: absolute; width: 100%; height: 100%; top: 0; left: 0; object-fit: fill; }
         canvas.overlay { pointer-events: none; z-index: 10; }
         
-        /* ROTATING WHEEL & PLAYBACK UI */
+        /* ROTATING WHEEL UI */
         .playback-controls { width: 100%; display: flex; flex-direction: column; align-items: center; margin-top: 10px; display: none; }
         .wheel-container { 
             width: 180px; height: 180px; border-radius: 50%; 
@@ -44,21 +44,21 @@
         #status { font-weight: bold; font-size: 13px; color: #ffaa00; margin-bottom: 5px; text-transform: uppercase; }
         
         /* 3-COLUMN SIDEBAR UI */
-        .dashboard { display: flex; width: 480px; flex-direction: column; background: #161616; padding: 10px; overflow-y: auto; border-left: 2px solid #333; }
+        .dashboard { display: flex; width: 550px; flex-direction: column; background: #161616; padding: 10px; overflow-y: auto; border-left: 2px solid #333; }
         .model-container { width: 100%; height: 180px; background: #000; border: 1px solid #444; border-radius: 6px; margin-bottom: 10px; position: relative; flex-shrink: 0; }
         .graph-container { width: 100%; height: 80px; background: #000; border: 1px solid #444; border-radius: 6px; margin-bottom: 10px; position: relative; flex-shrink: 0; }
         .graph-label { position: absolute; top: 5px; left: 5px; font-size: 9px; color: #888; z-index: 20; background: rgba(0,0,0,0.6); padding: 2px 4px; border-radius: 3px;}
         
-        .split-view { display: flex; gap: 5px; flex: 1; overflow-y: hidden;}
-        .feed-col { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
-        .feed-col h3 { font-size: 9px; color: #aaa; margin: 0 0 5px 0; border-bottom: 1px solid #333; padding-bottom: 3px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .split-view { display: flex; gap: 8px; flex: 1; overflow-y: hidden;}
+        .feed-col { display: flex; flex-direction: column; overflow-y: auto; }
+        .feed-col h3 { font-size: 10px; color: #aaa; margin: 0 0 5px 0; border-bottom: 1px solid #333; padding-bottom: 3px; text-align: center; }
         
-        /* Card Display Logic for Wheel Sync */
+        /* Data Cards */
         .card { background: #222; border-radius: 6px; padding: 8px; border-left: 3px solid #444; margin-bottom: 8px; display: none; }
         .result-card.visible { display: block; animation: fadeIn 0.2s ease; }
         .card h4 { margin: 0 0 4px 0; font-size: 11px; text-transform: uppercase; }
-        .mistake { display: flex; flex-direction: column; border-bottom: 1px solid #333; padding: 4px 0; font-size: 10px; }
-        .tag { font-size: 8px; font-weight: bold; border-radius: 3px; padding: 1px 3px; display: inline-block; margin-top: 2px; width: fit-content;}
+        .mistake { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 4px 0; font-size: 10px; align-items: center;}
+        .tag { font-size: 8px; font-weight: bold; border-radius: 3px; padding: 2px 4px; display: inline-block;}
         
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -104,20 +104,20 @@
 
         <div class="graph-container">
             <span class="graph-label">Gyro Telemetry</span>
-            <canvas id="gyroGraph" width="460" height="80" style="position: absolute; top:0; left:0;"></canvas>
+            <canvas id="gyroGraph" width="530" height="80" style="position: absolute; top:0; left:0;"></canvas>
             <div id="graphPlayhead" style="position:absolute; top:0; left:0; width:2px; height:80px; background:#fff; display:none; box-shadow: 0 0 5px #fff;"></div>
         </div>
         
         <div class="split-view">
-            <div class="feed-col">
+            <div class="feed-col" style="flex: 1;">
                 <h3>1. VISUAL TRACKING</h3>
                 <div id="shotList"></div>
             </div>
-            <div class="feed-col">
+            <div class="feed-col" style="flex: 1;">
                 <h3>2. KINEMATICS</h3>
                 <div id="kinematicList"></div>
             </div>
-            <div class="feed-col" style="flex: 1.2;">
+            <div class="feed-col" style="flex: 1.3;">
                 <h3>3. TOP 3 DEDUCTIONS</h3>
                 <div id="deductionList"></div>
             </div>
@@ -127,9 +127,6 @@
     <canvas id="calcCanvas" width="640" height="480" style="display:none;"></canvas>
 
 <script>
-    // ==========================================
-    // GLOBAL ARCHITECTURE
-    // ==========================================
     let isRecording = false, isAnalyzing = false;
     let stream, mediaRecorder, recordedChunks = [], sensorLog = [], recordingStartTime = 0;
     let telemetrySpikes = []; 
@@ -145,7 +142,7 @@
     const GYRO_MOVE_THRESH = 10.0;    
     const ACCEL_MOVE_THRESH = 1.5;    
     
-    // MISTAKE DATABASE FOR THE 3RD COLUMN
+    // COMPREHENSIVE MISTAKE DATABASE
     const mistakeDB = [
         { name: "Jerking the trigger", tele: ["Down", "Pitch", "Left"], vis: ["Low", "Left"] },
         { name: "Anticipating Recoil", tele: ["Down", "Pitch"], vis: ["Low"] },
@@ -156,7 +153,9 @@
         { name: "Breaking wrist up", tele: ["Up", "Pitch"], vis: ["High"] },
         { name: "Breaking wrist down", tele: ["Down", "Pitch"], vis: ["Low"] },
         { name: "Milking the grip", tele: ["Down", "Roll", "Left"], vis: ["Low", "Left"] },
-        { name: "Riding the recoil", tele: ["Up", "Pitch"], vis: ["High"] }
+        { name: "Riding the recoil", tele: ["Up", "Pitch"], vis: ["High"] },
+        { name: "Breathing offset", tele: ["Up", "Down"], vis: ["High", "Low"] },
+        { name: "Grip Tension", tele: ["Left", "Right", "Roll"], vis: ["Left", "Right"] }
     ];
 
     function onOpenCvReady() { document.getElementById('status').innerText = "System Ready."; document.getElementById('status').style.color = "#00ff00"; }
@@ -168,9 +167,6 @@
         viewer.addEventListener('finished', () => { viewer.pause(); });
     }
 
-    // ==========================================
-    // 1. DATA ACQUISITION
-    // ==========================================
     function startCamera() {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 640 }, height: { ideal: 480 } } })
         .then(s => { 
@@ -186,14 +182,7 @@
             window.addEventListener('deviceorientation', (e) => {
                 currentTilt.pitch = e.beta || 0; currentTilt.roll = e.gamma || 0; currentTilt.yaw = e.alpha || 0;
             });
-            
-            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                DeviceMotionEvent.requestPermission().then(state => {
-                    if (state === 'granted') window.addEventListener('devicemotion', handleMotion);
-                });
-            } else {
-                window.addEventListener('devicemotion', handleMotion); 
-            }
+            window.addEventListener('devicemotion', handleMotion); 
         });
     }
 
@@ -209,7 +198,6 @@
             viewer.orientation = `${currentTilt.pitch}deg ${currentTilt.yaw}deg ${currentTilt.roll}deg`;
         }
 
-        // Live 3D Spike trigger
         if (isRecording && (Math.abs(gx) > GYRO_SHOT_THRESHOLD || Math.abs(gy) > GYRO_SHOT_THRESHOLD)) {
             let now = performance.now();
             if (viewer && (!viewer.lastSpike || now - viewer.lastSpike > 500)) {
@@ -227,7 +215,7 @@
     }
 
     // ==========================================
-    // SCRUB WHEEL & REPEAT PLAY
+    // SCRUB WHEEL & PLAYBACK
     // ==========================================
     const wheel = document.getElementById('scrubWheel');
     const spinner = document.getElementById('wheelSpinner');
@@ -399,15 +387,12 @@
     function triggerAnalysisPhase() {
         document.getElementById('status').innerText = "⚙️ ANALYZING DATA...";
         drawRecordedGraph(); 
-        
-        // 1. Process Telemetry List (Original 131 behavior)
         processEntireSensorLog();
 
         let videoElement = document.getElementById('webcam');
         videoElement.srcObject = null; 
         videoElement.src = URL.createObjectURL(new Blob(recordedChunks, { type: mediaRecorder.mimeType }));   
         
-        // 2. Process Vision List (Original 131 behavior)
         videoElement.onplay = () => { isAnalyzing = true; trackingLoopPlayback(); };
         videoElement.onended = () => {
             isAnalyzing = false;
@@ -460,10 +445,7 @@
     }
 
     function diagnoseKinematics(dataSlice, shotId) {
-        let down = false, up = false, left = false, right = false;
-        let pitch = false, yaw = false, roll = false;
-        let moveString = "";
-
+        let down = false, up = false, left = false, right = false, pitch = false, yaw = false, roll = false;
         for (let s of dataSlice) {
             let adjustedZ = (s.az || 0) - 9.8; 
             if (s.ax > ACCEL_MOVE_THRESH) right = true;
@@ -476,30 +458,38 @@
         }
 
         let movesArray = [];
-        if (down) { moveString += "Down,"; movesArray.push("Down"); } 
-        if (up) { moveString += "Up,"; movesArray.push("Up"); } 
-        if (left) { moveString += "Left,"; movesArray.push("Left"); }
-        if (right) { moveString += "Right,"; movesArray.push("Right"); } 
-        if (pitch) { moveString += "Pitch,"; movesArray.push("Pitch"); } 
-        if (yaw) { moveString += "Yaw,"; movesArray.push("Yaw"); }
-        if (roll) { moveString += "Roll,"; movesArray.push("Roll"); }
+        if (down) movesArray.push("Down"); if (up) movesArray.push("Up"); if (left) movesArray.push("Left");
+        if (right) movesArray.push("Right"); if (pitch) movesArray.push("Pitch"); if (yaw) movesArray.push("Yaw");
+        if (roll) movesArray.push("Roll");
 
         let eventTime = dataSlice[dataSlice.length - 1].time_ms;
-        
-        // Save for the 3rd Column combination later
         telemetrySpikes.push({ time: eventTime, moves: movesArray });
 
-        // COLUMN 2: Original Kinematic List Display
+        // Score ALL telemetry mistakes for Column 2
+        let allTeleMatches = [];
+        mistakeDB.forEach(m => {
+            let score = 0;
+            m.tele.forEach(pattern => { if (movesArray.includes(pattern)) score += 10; });
+            if (score > 0) allTeleMatches.push({name: m.name, score: score});
+        });
+        allTeleMatches.sort((a,b) => b.score - a.score);
+
+        let matchesHtml = allTeleMatches.length > 0 
+            ? allTeleMatches.map(m => `<div class="mistake"><span style="color:#ddd">${m.name}</span><span style="color:#ff3b30">${m.score} pts</span></div>`).join('')
+            : `<div class="mistake"><span style="color:#777">No specific pattern</span></div>`;
+
+        // COLUMN 2 HTML
         document.getElementById('kinematicList').insertAdjacentHTML('beforeend', `
             <div class="card result-card" data-time="${eventTime}" style="border-left-color: #ff3b30;">
                 <h4 style="color: #ff3b30;">Event K-${shotId}</h4>
-                <div style="font-size: 9px; color: #aaa;">Raw: ${moveString || "None"}</div>
+                <div style="font-size: 8px; color: #888; margin-bottom: 4px;">RAW: ${movesArray.join(', ') || "None"}</div>
+                ${matchesHtml}
             </div>
         `);
     }
 
     // ==========================================
-    // 5. VISION (COLUMN 1) & COMBINED (COLUMN 3)
+    // 5. VISION (COL 1) & COMBINED (COL 3)
     // ==========================================
     function trackingLoopPlayback() {
         if(!isAnalyzing) return;
@@ -568,11 +558,13 @@
                     persistentShots.push({id: Date.now(), x:h.x, y:h.y, d: diag});
                     let shotID = persistentShots.length;
 
-                    // COLUMN 1: Original Vision List (131 behavior)
+                    // COLUMN 1: Original Vision List (Restored full array mapping)
+                    let visHtml = diag.m.map(m => `<div class="mistake"><span style="color:#ddd">${m.n}</span><span style="color:#00aaff">${m.p}</span></div>`).join('');
                     document.getElementById('shotList').insertAdjacentHTML('beforeend', `
                         <div class="card result-card" data-time="${vidTimeMs}" style="border-left-color: #00aaff;">
                             <h4 style="color:#00aaff;">Shot V-${shotID}</h4>
-                            <div style="font-size:9px;">Zone: ${diag.z}</div>
+                            <div style="font-size:8px; color:#888; margin-bottom:4px;">ZONE: ${diag.z}</div>
+                            ${visHtml}
                         </div>
                     `);
 
@@ -598,13 +590,15 @@
                     });
 
                     scored.sort((a,b) => b.score - a.score);
+                    
+                    // SLICE TOP 3 FOR DEDUCTION COLUMN
                     let top3 = scored.slice(0, 3).filter(m => m.score > 0);
 
                     let top3Html = top3.length > 0 
                         ? top3.map(m => `
-                            <div class="mistake">
-                                <span>${m.name}</span>
-                                <span class="tag" style="border:1px solid ${m.tagColor}; color:${m.tagColor};">${m.tag}</span>
+                            <div class="mistake" style="align-items: center;">
+                                <span style="color:#fff; flex:1;">${m.name}</span>
+                                <span class="tag" style="border:1px solid ${m.tagColor}; color:${m.tagColor}; margin-left:5px;">${m.tag}</span>
                             </div>`).join('')
                         : `<div class="mistake"><span style="color:#00ff00;">Clean Break</span></div>`;
 
@@ -623,17 +617,17 @@
         candidates = candidates.filter(c => c.f > 0);
     }
 
-    // Original 131 Vision Diagnostics
+    // ORIGINAL 131 VISION DIAGNOSTICS WITH FULL ARRAYS
     function getDiag131(x, y) {
         let dx = x - targetCenter.x, dy = targetCenter.y - y;
         let dist = Math.hypot(dx, dy);
-        if (dist < 15) return {z:"Center", m:[]}; 
+        if (dist < 15) return {z:"Center", m:[{n:"Clean Break", p:"Good"}]}; 
         
         let a = Math.atan2(dy, dx) * (180/Math.PI); if(a < 0) a += 360;
-        if(a > 45 && a <= 135) return {z:"High", m:[{n:"Riding Recoil", p:"High"}]};
-        if(a > 135 && a <= 225) return {z:"Left", m:[{n:"Trigger Depth", p:"High"}]};
-        if(a > 225 && a <= 315) return {z:"Low", m:[{n:"Trigger Jerking", p:"High"}]};
-        return {z:"Right", m:[{n:"Finger Tip Pressure", p:"High"}]};
+        if(a > 45 && a <= 135) return {z:"High", m:[{n:"Riding Recoil", p:"High"},{n:"Heeling", p:"Med"},{n:"Breathing", p:"Low"}]};
+        if(a > 135 && a <= 225) return {z:"Left", m:[{n:"Trigger Depth", p:"High"},{n:"Grip Tension", p:"Med"},{n:"Wrist Roll", p:"Low"}]};
+        if(a > 225 && a <= 315) return {z:"Low", m:[{n:"Trigger Jerking", p:"High"},{n:"Anticipation", p:"Med"},{n:"Flinching", p:"Low"}]};
+        return {z:"Right", m:[{n:"Finger Tip Pressure", p:"High"},{n:"Thumb Pressure", p:"Med"},{n:"Cheek Weld", p:"Low"}]};
     }
 
     function drawOverlay(H) {
