@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Smart Target - Advanced Deduction Engine</title>
+    <title>Smart Target - 3x3 Deduction Engine</title>
     
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
@@ -17,7 +17,7 @@
         canvas.overlay { pointer-events: none; z-index: 10; }
         
         /* ROTATING WHEEL UI */
-        .playback-controls { width: 100%; display: flex; flex-direction: column; align-items: center; margin-top: 10px; display: none; }
+        .playback-controls { width: 100%; display: flex; flex-direction: column; align-items: center; margin-top: 15px; display: none; }
         .wheel-container { 
             width: 180px; height: 180px; border-radius: 50%; 
             background: conic-gradient(from 0deg, #1a1a1a, #333, #1a1a1a);
@@ -58,6 +58,7 @@
         .result-card.visible { display: block; animation: fadeIn 0.2s ease; }
         .card h4 { margin: 0 0 4px 0; font-size: 11px; text-transform: uppercase; }
         .mistake { display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding: 4px 0; font-size: 10px; align-items: center;}
+        .mistake:last-child { border-bottom: none; }
         .tag { font-size: 8px; font-weight: bold; border-radius: 3px; padding: 2px 4px; display: inline-block;}
         
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
@@ -163,6 +164,8 @@
     // FORCE PREVENT 3D LOOPING
     const viewer = document.getElementById('weaponViewer');
     if (viewer) {
+        viewer.autoplay = false;
+        viewer.loop = false;
         viewer.addEventListener('loop', () => { viewer.pause(); });
         viewer.addEventListener('finished', () => { viewer.pause(); });
     }
@@ -387,12 +390,15 @@
     function triggerAnalysisPhase() {
         document.getElementById('status').innerText = "⚙️ ANALYZING DATA...";
         drawRecordedGraph(); 
+        
+        // 1. Process Telemetry List (Creates Column 2)
         processEntireSensorLog();
 
         let videoElement = document.getElementById('webcam');
         videoElement.srcObject = null; 
         videoElement.src = URL.createObjectURL(new Blob(recordedChunks, { type: mediaRecorder.mimeType }));   
         
+        // 2. Process Vision List (Creates Columns 1 & 3)
         videoElement.onplay = () => { isAnalyzing = true; trackingLoopPlayback(); };
         videoElement.onended = () => {
             isAnalyzing = false;
@@ -465,24 +471,30 @@
         let eventTime = dataSlice[dataSlice.length - 1].time_ms;
         telemetrySpikes.push({ time: eventTime, moves: movesArray });
 
-        // Score ALL telemetry mistakes for Column 2
+        // Score ALL telemetry mistakes
         let allTeleMatches = [];
         mistakeDB.forEach(m => {
             let score = 0;
             m.tele.forEach(pattern => { if (movesArray.includes(pattern)) score += 10; });
             if (score > 0) allTeleMatches.push({name: m.name, score: score});
         });
+        
         allTeleMatches.sort((a,b) => b.score - a.score);
+        
+        // ENSURE EXACTLY 3 RESULTS FOR TELEMETRY COLUMN
+        let top3Tele = allTeleMatches.slice(0, 3);
+        while(top3Tele.length < 3) top3Tele.push({name: "N/A", score: 0});
 
-        let matchesHtml = allTeleMatches.length > 0 
-            ? allTeleMatches.map(m => `<div class="mistake"><span style="color:#ddd">${m.name}</span><span style="color:#ff3b30">${m.score} pts</span></div>`).join('')
-            : `<div class="mistake"><span style="color:#777">No specific pattern</span></div>`;
+        let matchesHtml = top3Tele.map((m, i) => `
+            <div class="mistake">
+                <span style="color:#ddd">${i+1}. ${m.name}</span>
+                <span style="color:#ff3b30">${m.score > 0 ? m.score + ' pt' : ''}</span>
+            </div>`).join('');
 
-        // COLUMN 2 HTML
         document.getElementById('kinematicList').insertAdjacentHTML('beforeend', `
             <div class="card result-card" data-time="${eventTime}" style="border-left-color: #ff3b30;">
                 <h4 style="color: #ff3b30;">Event K-${shotId}</h4>
-                <div style="font-size: 8px; color: #888; margin-bottom: 4px;">RAW: ${movesArray.join(', ') || "None"}</div>
+                <div style="font-size: 8px; color: #888; margin-bottom: 4px;">RAW: ${movesArray.join(',') || "None"}</div>
                 ${matchesHtml}
             </div>
         `);
@@ -558,8 +570,13 @@
                     persistentShots.push({id: Date.now(), x:h.x, y:h.y, d: diag});
                     let shotID = persistentShots.length;
 
-                    // COLUMN 1: Original Vision List (Restored full array mapping)
-                    let visHtml = diag.m.map(m => `<div class="mistake"><span style="color:#ddd">${m.n}</span><span style="color:#00aaff">${m.p}</span></div>`).join('');
+                    // COLUMN 1: EXACTLY 3 VISION RESULTS
+                    let visHtml = diag.m.map((m, i) => `
+                        <div class="mistake">
+                            <span style="color:#ddd">${i+1}. ${m.n}</span>
+                            <span style="color:#00aaff">${m.p}</span>
+                        </div>`).join('');
+                        
                     document.getElementById('shotList').insertAdjacentHTML('beforeend', `
                         <div class="card result-card" data-time="${vidTimeMs}" style="border-left-color: #00aaff;">
                             <h4 style="color:#00aaff;">Shot V-${shotID}</h4>
@@ -581,7 +598,7 @@
                         m.tele.forEach(pattern => { if (tMoves.includes(pattern)) { score += 10; matchTele = true; } });
                         m.vis.forEach(z => { if (diag.z === z) { score += 15; matchVis = true; } });
                         
-                        let tag = "", tagColor = "";
+                        let tag = "NONE", tagColor = "#555";
                         if (matchVis && matchTele) { tag = "COMBINED"; tagColor = "#aa00ff"; }
                         else if (matchVis) { tag = "VISION"; tagColor = "#00aaff"; }
                         else if (matchTele) { tag = "TELEMETRY"; tagColor = "#ff3b30"; }
@@ -591,20 +608,19 @@
 
                     scored.sort((a,b) => b.score - a.score);
                     
-                    // SLICE TOP 3 FOR DEDUCTION COLUMN
-                    let top3 = scored.slice(0, 3).filter(m => m.score > 0);
+                    // ENSURE EXACTLY 3 RESULTS FOR DEDUCTION COLUMN
+                    let top3 = scored.slice(0, 3);
+                    while(top3.length < 3) top3.push({name: "N/A", score: 0, tag: "NONE", tagColor: "#555"});
 
-                    let top3Html = top3.length > 0 
-                        ? top3.map(m => `
-                            <div class="mistake" style="align-items: center;">
-                                <span style="color:#fff; flex:1;">${m.name}</span>
-                                <span class="tag" style="border:1px solid ${m.tagColor}; color:${m.tagColor}; margin-left:5px;">${m.tag}</span>
-                            </div>`).join('')
-                        : `<div class="mistake"><span style="color:#00ff00;">Clean Break</span></div>`;
+                    let top3Html = top3.map((m, i) => `
+                        <div class="mistake" style="align-items: center;">
+                            <span style="color:#fff; flex:1;">${i+1}. ${m.name}</span>
+                            <span class="tag" style="border:1px solid ${m.tagColor}; color:${m.tagColor}; margin-left:2px;">${m.tag}</span>
+                        </div>`).join('');
 
                     document.getElementById('deductionList').insertAdjacentHTML('beforeend', `
                         <div class="card result-card" data-time="${vidTimeMs}" style="border-left-color: #aa00ff;">
-                            <h4 style="color:#aa00ff;">Deduction ${shotID}</h4>
+                            <h4 style="color:#aa00ff;">Deduct ${shotID}</h4>
                             ${top3Html}
                         </div>
                     `);
@@ -617,11 +633,11 @@
         candidates = candidates.filter(c => c.f > 0);
     }
 
-    // ORIGINAL 131 VISION DIAGNOSTICS WITH FULL ARRAYS
+    // ORIGINAL VISION DIAGNOSTICS PADDED TO 3 GUARANTEED RESULTS
     function getDiag131(x, y) {
         let dx = x - targetCenter.x, dy = targetCenter.y - y;
         let dist = Math.hypot(dx, dy);
-        if (dist < 15) return {z:"Center", m:[{n:"Clean Break", p:"Good"}]}; 
+        if (dist < 15) return {z:"Center", m:[{n:"Clean Break", p:"Good"}, {n:"Stable Stance", p:"Good"}, {n:"Smooth Trigger", p:"Good"}]}; 
         
         let a = Math.atan2(dy, dx) * (180/Math.PI); if(a < 0) a += 360;
         if(a > 45 && a <= 135) return {z:"High", m:[{n:"Riding Recoil", p:"High"},{n:"Heeling", p:"Med"},{n:"Breathing", p:"Low"}]};
