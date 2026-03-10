@@ -3,12 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Smart Target - Top 3 Deduction Engine</title>
+    <title>Smart Target - Diagnostics & 3D</title>
     
     <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
-    <script>var Module = { onRuntimeInitialized: function() { onOpenCvReady(); } };</script>
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js"></script>
+    <script>
+        var Module = { 
+            onRuntimeInitialized: function() { 
+                document.getElementById('status').innerText = "System Ready. Start Camera."; 
+                document.getElementById('status').style.color = "#00ff00";
+            } 
+        };
+    </script>
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onerror="document.getElementById('status').innerText='Error downloading Vision Engine. Check connection.'; document.getElementById('status').style.color='red';"></script>
+    
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #0a0a0a; color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; touch-action: none; }
         .main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px; overflow-y: auto; }
@@ -16,36 +24,21 @@
         video, canvas.overlay { position: absolute; width: 100%; height: 100%; top: 0; left: 0; object-fit: fill; }
         canvas.overlay { pointer-events: none; z-index: 10; }
         
-        /* ROTATING WHEEL & PLAYBACK UI */
+        /* MASSIVE SCRUB WHEEL UI */
         .playback-controls { width: 100%; display: flex; flex-direction: column; align-items: center; margin-top: 15px; display: none; }
-        .wheel-container { 
-            width: 200px; height: 200px; border-radius: 50%; 
-            background: conic-gradient(from 0deg, #1a1a1a, #333, #1a1a1a);
-            position: relative; cursor: grab; 
-            border: 4px solid #555; box-shadow: 0 4px 15px rgba(0,0,0,0.8); 
-            touch-action: none; display: flex; justify-content: center; align-items: center;
-        }
-        .wheel-spinner { 
-            width: 100%; height: 100%; position: absolute; border-radius: 50%; pointer-events: none; 
-            background: repeating-conic-gradient(from 0deg, transparent 0deg 10deg, rgba(255,255,255,0.05) 10deg 20deg);
-        }
+        .wheel-container { width: 200px; height: 200px; border-radius: 50%; background: conic-gradient(from 0deg, #1a1a1a, #333, #1a1a1a); position: relative; cursor: grab; border: 4px solid #555; box-shadow: 0 4px 15px rgba(0,0,0,0.8); touch-action: none; display: flex; justify-content: center; align-items: center; }
+        .wheel-spinner { width: 100%; height: 100%; position: absolute; border-radius: 50%; pointer-events: none; background: repeating-conic-gradient(from 0deg, transparent 0deg 10deg, rgba(255,255,255,0.05) 10deg 20deg); }
         .wheel-indicator { position: absolute; top: 0; left: 50%; width: 8px; height: 20px; background: #00aaff; transform: translateX(-50%); border-radius: 4px; box-shadow: 0 0 8px #00aaff;}
-        .wheel-center-btn { 
-            position: absolute; width: 70px; height: 70px; border-radius: 50%; 
-            background: #007bff; border: 3px solid #0056b3; color: white; 
-            font-size: 24px; font-weight: bold; cursor: pointer; z-index: 10; 
-            display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-        }
+        .wheel-center-btn { position: absolute; width: 70px; height: 70px; border-radius: 50%; background: #007bff; border: 3px solid #0056b3; color: white; font-size: 24px; font-weight: bold; cursor: pointer; z-index: 10; display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
         .playback-info { font-family: monospace; font-size: 18px; font-weight: bold; color: #00aaff; margin-top: 10px; }
 
         button { background: #007bff; color: white; border: none; padding: 12px 24px; font-size: 14px; cursor: pointer; border-radius: 6px; font-weight: bold; margin: 5px; }
         button:disabled { background: #444; cursor: not-allowed; }
         #btnRecord.recording { background: #ff3b30; animation: pulse 1.5s infinite; }
-        #status { font-weight: bold; font-size: 14px; color: #00ff00; margin-bottom: 5px; text-transform: uppercase; }
+        #status { font-weight: bold; font-size: 13px; color: #ffaa00; margin-bottom: 5px; text-transform: uppercase; text-align: center; }
         
         .dashboard { display: flex; width: 400px; flex-direction: column; background: #161616; padding: 15px; overflow-y: auto; border-left: 2px solid #333; }
         .model-container { width: 100%; height: 220px; background: #000; border: 1px solid #444; border-radius: 6px; margin-bottom: 10px; position: relative; flex-shrink: 0; }
-        
         .graph-container { width: 100%; height: 100px; background: #000; border: 1px solid #444; border-radius: 6px; margin-bottom: 15px; position: relative; flex-shrink: 0; }
         .graph-label { position: absolute; top: 5px; left: 5px; font-size: 10px; color: #888; z-index: 20; background: rgba(0,0,0,0.6); padding: 4px; border-radius: 4px;}
         .split-view { display: flex; gap: 10px; flex: 1; overflow-y: hidden;}
@@ -64,7 +57,7 @@
 
     <div class="main">
         <h2 style="margin:0 0 5px 0; font-size: 18px;">Post-Process Engine & Telemetry</h2>
-        <p id="status">Loading WASM...</p>
+        <p id="status">LOADING WASM (MAY TAKE 5-10 SECONDS)...</p>
         <div class="video-box" id="vbox">
             <video id="webcam" autoplay playsinline muted></video>
             <canvas id="overlayCanvas" class="overlay" width="640" height="480"></canvas>
@@ -72,9 +65,7 @@
         
         <div class="playback-controls" id="playbackControls">
             <div class="wheel-container" id="scrubWheel">
-                <div class="wheel-spinner" id="wheelSpinner">
-                    <div class="wheel-indicator"></div>
-                </div>
+                <div class="wheel-spinner" id="wheelSpinner"><div class="wheel-indicator"></div></div>
                 <div class="wheel-center-btn" id="btnPlayPause">▶</div>
             </div>
             <div class="playback-info" id="timeLabel">0.00s</div>
@@ -109,4 +100,527 @@
         <div class="split-view">
             <div class="feed-col" style="flex: 0.8;">
                 <h3 style="color:#aaa; font-size:11px; margin:0 0 10px 0; border-bottom:1px solid #333;">SHOT LOG</h3>
-                <div id="shotList">
+                <div id="shotList"></div>
+            </div>
+            <div class="feed-col" style="flex: 1.5;">
+                <h3 style="color:#aaa; font-size:11px; margin:0 0 10px 0; border-bottom:1px solid #333;">DIAGNOSTICS (TOP 3)</h3>
+                <div id="kinematicList"></div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="calcCanvas" width="640" height="480" style="display:none;"></canvas>
+
+<script>
+    // ==========================================
+    // GLOBAL ARCHITECTURE
+    // ==========================================
+    let isRecording = false, isAnalyzing = false;
+    let stream, mediaRecorder, recordedChunks = [], sensorLog = [], recordingStartTime = 0;
+    let telemetrySpikes = []; 
+    let currentTilt = { pitch: 0, roll: 0, yaw: 0 };
+
+    let orb = null, matcher = null, refKP = null, refDesc = null, refGray = null;
+    let cropSize = 0, targetRadius = 0, persistentShots = [], candidates = [], blacklist = [];
+    let targetCenter = { x: 0, y: 0 }; 
+    const PROXIMITY = 15.0, REQ_FRAMES = 4; 
+
+    const GYRO_SHOT_THRESHOLD = 80;   
+    const ACCEL_SHOT_THRESHOLD = 15;  
+    const GYRO_MOVE_THRESH = 10.0;    
+    const ACCEL_MOVE_THRESH = 1.5;    
+    
+    const mistakeDB = [
+        { name: "Jerking the trigger", tele: ["Down", "Pitch", "Left"], vis: ["Low", "Left"] },
+        { name: "Anticipating Recoil", tele: ["Down", "Pitch"], vis: ["Low"] },
+        { name: "Heeling (Pushing forward)", tele: ["Up", "Pitch"], vis: ["High"] },
+        { name: "Too much trigger finger", tele: ["Right", "Yaw"], vis: ["Right"] },
+        { name: "Too little trigger finger", tele: ["Left", "Yaw"], vis: ["Left"] },
+        { name: "Thumb Pressure", tele: ["Right", "Roll"], vis: ["Right"] },
+        { name: "Breaking wrist up", tele: ["Up", "Pitch"], vis: ["High"] },
+        { name: "Breaking wrist down", tele: ["Down", "Pitch"], vis: ["Low"] },
+        { name: "Tightening grip (Milking)", tele: ["Down", "Roll", "Left"], vis: ["Low", "Left"] },
+        { name: "Riding the recoil", tele: ["Up", "Pitch"], vis: ["High"] }
+    ];
+
+    // 3D MODEL FIX: PREVENT INTERNAL LOOPING
+    const viewer = document.getElementById('weaponViewer');
+    if (viewer) {
+        viewer.autoplay = false;
+        viewer.loop = false;
+        viewer.addEventListener('loop', () => { viewer.pause(); });
+        viewer.addEventListener('finished', () => { viewer.pause(); });
+    }
+
+    // ==========================================
+    // 1. DATA ACQUISITION (ROBUST VERSION)
+    // ==========================================
+    function startCamera() {
+        const statusEl = document.getElementById('status');
+        statusEl.innerText = "Requesting Camera...";
+        statusEl.style.color = "#ffaa00";
+
+        // Relaxed constraints to force mobile browsers to accept
+        navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: { ideal: "environment" }, width: { ideal: 640 }, height: { ideal: 480 } } 
+        })
+        .then(s => { 
+            stream = s;
+            const videoEl = document.getElementById('webcam');
+            videoEl.srcObject = stream; 
+            
+            // Explicit play to satisfy mobile Safari policies
+            videoEl.play().then(() => {
+                document.getElementById('btnBase').disabled = false; 
+                document.getElementById('btnCam').style.display = 'none';
+                statusEl.innerText = "Camera Active. Lock target.";
+                statusEl.style.color = "#00ff00";
+            }).catch(e => {
+                statusEl.innerText = "Video Error: " + e.message;
+                statusEl.style.color = "#ff3b30";
+            });
+            
+            // Sensors
+            window.addEventListener('deviceorientation', (e) => {
+                currentTilt.pitch = e.beta || 0; currentTilt.roll = e.gamma || 0; currentTilt.yaw = e.alpha || 0;
+            });
+            
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                DeviceMotionEvent.requestPermission().then(state => {
+                    if (state === 'granted') window.addEventListener('devicemotion', handleMotion);
+                }).catch(console.error);
+            } else {
+                window.addEventListener('devicemotion', handleMotion); 
+            }
+        })
+        .catch(e => { 
+            console.error(e);
+            if(location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                statusEl.innerText = "ERROR: HTTPS is required for Camera access.";
+            } else {
+                statusEl.innerText = "Camera Error: " + e.name;
+            }
+            statusEl.style.color = "#ff3b30";
+        });
+    }
+
+    function handleMotion(event) {
+        let ax = event.accelerationIncludingGravity?.x || 0;
+        let ay = event.accelerationIncludingGravity?.y || 0;
+        let az = event.accelerationIncludingGravity?.z || 0;
+        let gx = event.rotationRate?.alpha || 0; 
+        let gy = event.rotationRate?.beta || 0;  
+        let gz = event.rotationRate?.gamma || 0; 
+
+        if (viewer && !isAnalyzing) {
+            viewer.orientation = `${currentTilt.pitch}deg ${currentTilt.yaw}deg ${currentTilt.roll}deg`;
+        }
+
+        if (isRecording && (Math.abs(gx) > GYRO_SHOT_THRESHOLD || Math.abs(gy) > GYRO_SHOT_THRESHOLD)) {
+            let now = performance.now();
+            if (viewer && (!viewer.lastSpike || now - viewer.lastSpike > 500)) {
+                viewer.lastSpike = now; viewer.currentTime = 0; viewer.play(); 
+            }
+        }
+
+        if (!isRecording) return; 
+
+        sensorLog.push({
+            time_ms: performance.now() - recordingStartTime,
+            ax: ax, ay: ay, az: az, gx: gx, gy: gy, gz: gz,
+            tp: currentTilt.pitch, tr: currentTilt.roll, ty: currentTilt.yaw
+        });
+    }
+
+    // ==========================================
+    // SCRUB WHEEL & REPEAT AUTO-PLAY LOGIC
+    // ==========================================
+    const wheel = document.getElementById('scrubWheel');
+    const spinner = document.getElementById('wheelSpinner');
+    const playBtn = document.getElementById('btnPlayPause');
+    
+    let isDraggingWheel = false, lastAngle = 0, visualAngle = 0, playbackProgress = 0, isAutoPlaying = false, playInterval;
+
+    wheel.addEventListener('pointerdown', (e) => {
+        if (!isAnalyzing || sensorLog.length === 0 || e.target === playBtn) return;
+        isDraggingWheel = true; pausePlayback();
+        wheel.setPointerCapture(e.pointerId);
+        let rect = wheel.getBoundingClientRect();
+        lastAngle = Math.atan2(e.clientY - (rect.top + rect.height/2), e.clientX - (rect.left + rect.width/2));
+    });
+
+    wheel.addEventListener('pointermove', (e) => {
+        if (!isDraggingWheel) return;
+        let rect = wheel.getBoundingClientRect();
+        let angle = Math.atan2(e.clientY - (rect.top + rect.height/2), e.clientX - (rect.left + rect.width/2));
+        let delta = angle - lastAngle;
+        if (delta > Math.PI) delta -= 2 * Math.PI;
+        if (delta < -Math.PI) delta += 2 * Math.PI;
+        lastAngle = angle;
+
+        visualAngle += delta * (180 / Math.PI);
+        playbackProgress += delta / (Math.PI * 4); 
+        if (playbackProgress < 0) playbackProgress = 0;
+        if (playbackProgress > 1) playbackProgress = 1;
+
+        applyPlaybackProgress();
+    });
+
+    wheel.addEventListener('pointerup', () => isDraggingWheel = false);
+    wheel.addEventListener('pointercancel', () => isDraggingWheel = false);
+
+    playBtn.onclick = function() {
+        if (isAutoPlaying) { pausePlayback(); } else { startPlayback(); }
+    };
+
+    function startPlayback() {
+        isAutoPlaying = true; playBtn.innerText = "⏸";
+        if (playbackProgress >= 1) playbackProgress = 0; 
+        let videoElement = document.getElementById('webcam');
+        if (videoElement.duration) videoElement.play();
+
+        playInterval = setInterval(() => {
+            if (videoElement.duration) { playbackProgress = videoElement.currentTime / videoElement.duration; } 
+            else { playbackProgress += 0.01; }
+            visualAngle = playbackProgress * 720;
+            applyPlaybackProgress(true);
+            if (playbackProgress >= 1) pausePlayback();
+        }, 30);
+    }
+
+    function pausePlayback() {
+        isAutoPlaying = false; playBtn.innerText = "▶";
+        clearInterval(playInterval);
+        document.getElementById('webcam').pause();
+    }
+
+    function applyPlaybackProgress(isAuto = false) {
+        if (sensorLog.length === 0) return;
+        spinner.style.transform = `rotate(${visualAngle}deg)`;
+
+        let idx = Math.floor(playbackProgress * (sensorLog.length - 1));
+        let s = sensorLog[idx];
+        if (!s) return;
+        
+        let videoElement = document.getElementById('webcam');
+        if (!isAuto && videoElement.duration) { videoElement.currentTime = playbackProgress * videoElement.duration; }
+
+        if (viewer) viewer.orientation = `${s.tp}deg ${s.ty}deg ${s.tr}deg`;
+
+        if (Math.abs(s.gx) > GYRO_SHOT_THRESHOLD || Math.abs(s.gy) > GYRO_SHOT_THRESHOLD) {
+            let now = performance.now();
+            if (viewer && (!viewer.lastSpike || now - viewer.lastSpike > 500)) {
+                viewer.lastSpike = now; viewer.currentTime = 0; viewer.play(); 
+            }
+        }
+
+        let canvas = document.getElementById('gyroGraph');
+        let playhead = document.getElementById('graphPlayhead');
+        if (canvas && playhead) {
+            playhead.style.display = 'block';
+            playhead.style.left = (playbackProgress * canvas.width) + 'px';
+        }
+
+        let currentMs = s.time_ms;
+        document.querySelectorAll('.result-card').forEach(c => {
+            let cardTime = parseFloat(c.getAttribute('data-time'));
+            if (cardTime <= currentMs) c.classList.add('visible');
+            else c.classList.remove('visible');
+        });
+
+        document.getElementById('timeLabel').innerText = (currentMs / 1000).toFixed(2) + "s";
+    }
+
+    // ==========================================
+    // 2. VISION BASELINE (ORIGINAL 131)
+    // ==========================================
+    function grab() {
+        let cvs = document.getElementById('calcCanvas');
+        cvs.getContext('2d').drawImage(document.getElementById('webcam'), 0,0,640,480);
+        return cv.imread(cvs);
+    }
+
+    function setBaseline() {
+        if(!orb) { orb = new cv.ORB(1500); matcher = new cv.BFMatcher(cv.NORM_HAMMING, true); refKP = new cv.KeyPointVector(); refDesc = new cv.Mat(); }
+        let frame = grab();
+        let gray = new cv.Mat(), thresh = new cv.Mat();
+        cv.cvtColor(frame, gray, cv.COLOR_RGBA2GRAY);
+        cv.adaptiveThreshold(gray, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 15, 5);
+        let contours = new cv.MatVector(), hierarchy = new cv.Mat();
+        cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+        
+        let best = null, maxA = 0;
+        for(let i=0; i<contours.size(); i++) {
+            let a = cv.contourArea(contours.get(i));
+            if(a > 3000 && a > maxA) { maxA = a; best = cv.minEnclosingCircle(contours.get(i)); }
+        }
+        if(!best) { alert("Center target!"); frame.delete(); gray.delete(); thresh.delete(); return; }
+
+        targetRadius = Math.round(best.radius); cropSize = targetRadius * 2 + 60;
+        let rx = Math.max(0, best.center.x - cropSize/2), ry = Math.max(0, best.center.y - cropSize/2);
+        targetCenter = { x: best.center.x - rx, y: best.center.y - ry };
+
+        let roi = frame.roi(new cv.Rect(rx, ry, Math.min(640-rx, cropSize), Math.min(480-ry, cropSize)));
+        if(refGray) refGray.delete();
+        refGray = new cv.Mat(); cv.cvtColor(roi, refGray, cv.COLOR_RGBA2GRAY);
+        
+        let mask = cv.Mat.zeros(roi.rows, roi.cols, cv.CV_8UC1);
+        cv.circle(mask, new cv.Point(targetCenter.x, targetCenter.y), targetRadius - 10, new cv.Scalar(255), -1);
+        orb.detectAndCompute(refGray, mask, refKP, refDesc);
+
+        document.getElementById('btnRecord').disabled = false;
+        document.getElementById('btnBase').style.display = 'none';
+        document.getElementById('status').innerText = "Target Locked.";
+        frame.delete(); gray.delete(); thresh.delete(); contours.delete(); hierarchy.delete(); mask.delete(); roi.delete();
+    }
+
+    // ==========================================
+    // 3. RECORDING & ANALYSIS TRIGGER
+    // ==========================================
+    function toggleRecording() {
+        let btn = document.getElementById('btnRecord');
+        if (!isRecording) {
+            recordedChunks = []; sensorLog = []; persistentShots = []; telemetrySpikes = [];
+            document.getElementById('shotList').innerHTML = ""; document.getElementById('kinematicList').innerHTML = "";
+            document.getElementById('overlayCanvas').getContext('2d').clearRect(0,0,640,480);
+            document.getElementById('playbackControls').style.display = 'none';
+
+            let options = { mimeType: 'video/webm; codecs=vp8' };
+            if (!MediaRecorder.isTypeSupported('video/webm; codecs=vp8')) options = { mimeType: 'video/mp4' }; 
+
+            mediaRecorder = new MediaRecorder(stream, options);
+            mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.onstop = triggerAnalysisPhase;
+
+            recordingStartTime = performance.now();
+            isRecording = true; mediaRecorder.start();
+            btn.innerText = "Stop & Analyze"; btn.classList.add("recording");
+        } else {
+            isRecording = false; mediaRecorder.stop(); btn.style.display = 'none'; 
+        }
+    }
+
+    function triggerAnalysisPhase() {
+        document.getElementById('status').innerText = "⚙️ ANALYZING DATA...";
+        drawRecordedGraph(); 
+        processTelemetryArray();
+
+        let videoElement = document.getElementById('webcam');
+        videoElement.srcObject = null; 
+        videoElement.src = URL.createObjectURL(new Blob(recordedChunks, { type: mediaRecorder.mimeType }));   
+        
+        videoElement.onplay = () => { isAnalyzing = true; trackingLoopPlayback(); };
+        videoElement.onended = () => {
+            isAnalyzing = false;
+            document.getElementById('status').innerText = "✅ ANALYSIS COMPLETE";
+            
+            document.getElementById('playbackControls').style.display = 'flex';
+            
+            // Start the scrubber at the END of the timeline to reveal all cards instantly
+            playbackProgress = 1.0; 
+            visualAngle = 720;
+            applyPlaybackProgress();
+            
+            let btn = document.getElementById('btnRecord');
+            btn.style.display = 'block'; btn.style.background = "#007bff";
+            btn.innerText = "Reset Camera for Next Run"; btn.classList.remove("recording");
+            btn.onclick = () => location.reload(); 
+        };
+        videoElement.play();
+    }
+
+    // ==========================================
+    // 4. COMBINED TELEMETRY & VISION MATH
+    // ==========================================
+    function drawRecordedGraph() {
+        const canvas = document.getElementById('gyroGraph');
+        if (!canvas || sensorLog.length === 0) return;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const step = canvas.width / sensorLog.length;
+
+        function plotLine(key, color) {
+            ctx.strokeStyle = color; ctx.lineWidth = 1.0; ctx.beginPath();
+            for (let i = 0; i < sensorLog.length; i++) {
+                let y = (canvas.height / 2) - ((sensorLog[i][key] || 0) * 0.5); 
+                if (i === 0) ctx.moveTo(i * step, y); else ctx.lineTo(i * step, y);
+            }
+            ctx.stroke();
+        }
+        plotLine('gx', '#ff4444'); plotLine('gy', '#44ff44'); plotLine('gz', '#4444ff'); 
+    }
+
+    function processTelemetryArray() {
+        let lastSpikeTime = -1000;
+        for (let i = 0; i < sensorLog.length; i++) {
+            let s = sensorLog[i];
+            if (s.time_ms - lastSpikeTime > 500) {
+                if (Math.abs(s.gx) > GYRO_SHOT_THRESHOLD || Math.abs(s.gy) > GYRO_SHOT_THRESHOLD || Math.abs(s.ax) > ACCEL_SHOT_THRESHOLD) {
+                    lastSpikeTime = s.time_ms;
+                    let preShotSlice = sensorLog.filter(data => data.time_ms >= s.time_ms - 400 && data.time_ms <= s.time_ms);
+                    
+                    let down = false, up = false, left = false, right = false, pitch = false, yaw = false, roll = false;
+                    for (let d of preShotSlice) {
+                        let adjustedZ = (d.az || 0) - 9.8; 
+                        if (d.ax > ACCEL_MOVE_THRESH) right = true;
+                        if (d.ax < -ACCEL_MOVE_THRESH) left = true;
+                        if (adjustedZ > ACCEL_MOVE_THRESH) up = true;
+                        if (adjustedZ < -ACCEL_MOVE_THRESH) down = true;
+                        if (Math.abs(d.gx) > GYRO_MOVE_THRESH) roll = true;
+                        if (Math.abs(d.gy) > GYRO_MOVE_THRESH) pitch = true;
+                        if (Math.abs(d.gz) > GYRO_MOVE_THRESH) yaw = true;
+                    }
+
+                    let moves = [];
+                    if(down) moves.push("Down"); if(up) moves.push("Up"); if(left) moves.push("Left");
+                    if(right) moves.push("Right"); if(pitch) moves.push("Pitch"); if(yaw) moves.push("Yaw");
+                    if(roll) moves.push("Roll");
+
+                    telemetrySpikes.push({ time: s.time_ms, moves: moves });
+                }
+            }
+        }
+    }
+
+    function trackingLoopPlayback() {
+        if(!isAnalyzing) return;
+        let v = document.getElementById('webcam');
+        if (v.readyState >= 2) {
+            let frame = grab(), grayLive = new cv.Mat(), liveKP = new cv.KeyPointVector(), liveDesc = new cv.Mat(), matches = new cv.DMatchVector();
+            try {
+                cv.cvtColor(frame, grayLive, cv.COLOR_RGBA2GRAY);
+                orb.detectAndCompute(grayLive, new cv.Mat(), liveKP, liveDesc);
+                if(!liveDesc.empty()) {
+                    matcher.match(refDesc, liveDesc, matches);
+                    let good = [];
+                    for(let i=0; i<matches.size(); i++) { if(matches.get(i).distance < 48) good.push(matches.get(i)); }
+                    if(good.length > 10) {
+                        let srcP = [], dstP = [];
+                        for(let m of good) { srcP.push(refKP.get(m.queryIdx).pt.x, refKP.get(m.queryIdx).pt.y); dstP.push(liveKP.get(m.trainIdx).pt.x, liveKP.get(m.trainIdx).pt.y); }
+                        let matSrc = cv.matFromArray(good.length, 1, cv.CV_32FC2, srcP), matDst = cv.matFromArray(good.length, 1, cv.CV_32FC2, dstP);
+                        let H = cv.findHomography(matSrc, matDst, cv.RANSAC, 5.0);
+                        if(!H.empty()) {
+                            let invH = new cv.Mat(); cv.invert(H, invH, cv.DECOMP_LU);
+                            let warped = new cv.Mat(); cv.warpPerspective(grayLive, warped, invH, new cv.Size(refGray.cols, refGray.rows));
+                            let diff = new cv.Mat(), thresh = new cv.Mat();
+                            cv.absdiff(refGray, warped, diff); cv.threshold(diff, thresh, 50, 255, cv.THRESH_BINARY);
+                            
+                            let liveMask = cv.Mat.zeros(refGray.rows, refGray.cols, cv.CV_8UC1);
+                            cv.circle(liveMask, new cv.Point(targetCenter.x, targetCenter.y), targetRadius - 15, new cv.Scalar(255), -1);
+                            let maskedThresh = new cv.Mat(); thresh.copyTo(maskedThresh, liveMask);
+
+                            let contours = new cv.MatVector(), hier = new cv.Mat();
+                            cv.findContours(maskedThresh, contours, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+                            
+                            let currentHoles = [];
+                            for(let i=0; i<contours.size(); i++) {
+                                let cnt = contours.get(i), area = cv.contourArea(cnt);
+                                if(area > 15 && area < 600) {
+                                    let M = cv.moments(cnt); let p = {x: M.m10/M.m00, y: M.m01/M.m00};
+                                    let distFromCenter = Math.hypot(p.x - targetCenter.x, p.y - targetCenter.y);
+                                    if (distFromCenter > targetRadius - 15) continue; 
+                                    if(blacklist.some(b => Math.hypot(b.x-p.x, b.y-p.y) < PROXIMITY)) continue;
+                                    let hull = new cv.Mat(); cv.convexHull(cnt, hull);
+                                    let solidity = area / (cv.contourArea(hull) || 1); hull.delete();
+                                    if(solidity > 0.80) currentHoles.push(p);
+                                    else if(solidity < 0.65) blacklist.push(p); 
+                                }
+                            }
+                            processShots(currentHoles); drawOverlay(H);
+                            invH.delete(); warped.delete(); diff.delete(); thresh.delete(); liveMask.delete(); maskedThresh.delete(); contours.delete(); hier.delete(); H.delete();
+                        }
+                        matSrc.delete(); matDst.delete();
+                    }
+                }
+            } catch(e) { console.error(e); } finally { frame.delete(); grayLive.delete(); liveKP.delete(); liveDesc.delete(); matches.delete(); }
+        }
+        if (isAnalyzing) requestAnimationFrame(trackingLoopPlayback);
+    }
+
+    function processShots(holes) {
+        for(let h of holes) {
+            if(persistentShots.some(s => Math.hypot(s.x-h.x, s.y-h.y) < PROXIMITY)) continue;
+            let c = candidates.find(can => Math.hypot(can.x-h.x, can.y-h.y) < PROXIMITY);
+            if(c) { 
+                c.f++; 
+                if(c.f >= REQ_FRAMES) {
+                    let vidTimeMs = document.getElementById('webcam').currentTime * 1000;
+                    let zone = getDiagZone(h.x, h.y);
+                    persistentShots.push({id: Date.now(), x:h.x, y:h.y, z: zone});
+                    let shotID = persistentShots.length;
+
+                    // Find Nearest Telemetry Spike
+                    let closestSpike = null, minDiff = 1000;
+                    telemetrySpikes.forEach(spike => {
+                        let diff = Math.abs(spike.time - vidTimeMs);
+                        if (diff < minDiff) { minDiff = diff; closestSpike = spike; }
+                    });
+                    let tMoves = closestSpike ? closestSpike.moves : [];
+
+                    // Score Mistakes
+                    let scored = mistakeDB.map(m => {
+                        let score = 0;
+                        m.tele.forEach(pattern => { if (tMoves.includes(pattern)) score += 10; });
+                        m.vis.forEach(z => { if (zone === z) score += 15; });
+                        return { name: m.name, score: score };
+                    });
+
+                    scored.sort((a,b) => b.score - a.score);
+                    let top3 = scored.slice(0, 3).filter(m => m.score > 0);
+
+                    // Insert HIDDEN cards, which are revealed dynamically by the timeline wheel logic
+                    document.getElementById('shotList').insertAdjacentHTML('beforeend', `
+                        <div class="card result-card" data-time="${vidTimeMs}" style="border-left-color: #00aaff;">
+                            <h4 style="margin:0 0 5px 0; font-size:12px; color:#00aaff;">Shot ${shotID}</h4>
+                            <div style="font-size:11px;">Zone: ${zone}</div>
+                        </div>
+                    `);
+
+                    let top3Html = top3.length > 0 
+                        ? top3.map((m, i) => `<div class="mistake"><span>${i+1}. ${m.name}</span><span class="prob" style="color:#ffcc00">${m.score} pts</span></div>`).join('')
+                        : `<div class="mistake"><span>Center / Clean Break</span></div>`;
+
+                    document.getElementById('kinematicList').insertAdjacentHTML('beforeend', `
+                        <div class="card result-card" data-time="${vidTimeMs}" style="border-left-color: #ff3b30;">
+                            <h4 style="margin:0 0 5px 0; font-size:12px; color:#ff3b30;">Shot ${shotID} Diagnosis</h4>
+                            <div style="font-size: 10px; color: #888; margin-bottom:5px;">Moves: ${tMoves.join(',') || "None"} | Vis: ${zone}</div>
+                            ${top3Html}
+                        </div>
+                    `);
+
+                    candidates = candidates.filter(can => can !== c);
+                }
+            } else candidates.push({x:h.x, y:h.y, f:1});
+        }
+        candidates.forEach(c => { c.f -= 0.1; });
+        candidates = candidates.filter(c => c.f > 0);
+    }
+
+    function getDiagZone(x, y) {
+        let dx = x - targetCenter.x, dy = targetCenter.y - y;
+        let dist = Math.hypot(dx, dy);
+        if (dist < 15) return "Center"; 
+        
+        let a = Math.atan2(dy, dx) * (180/Math.PI); if(a < 0) a += 360;
+        if(a > 45 && a <= 135) return "High";
+        if(a > 135 && a <= 225) return "Left";
+        if(a > 225 && a <= 315) return "Low";
+        return "Right";
+    }
+
+    function drawOverlay(H) {
+        let ctx = document.getElementById('overlayCanvas').getContext('2d');
+        ctx.clearRect(0,0,640,480);
+        persistentShots.forEach((s, idx) => {
+            let p = cv.matFromArray(3, 1, cv.CV_64F, [s.x, s.y, 1.0]);
+            let dP = new cv.Mat(); cv.gemm(H, p, 1, new cv.Mat(), 0, dP);
+            let x = dP.data64F[0]/dP.data64F[2], y = dP.data64F[1]/dP.data64F[2];
+            ctx.beginPath(); ctx.arc(x,y,10,0,6.28); ctx.fillStyle="rgba(0,255,0,0.7)"; ctx.fill();
+            ctx.strokeStyle="white"; ctx.stroke();
+            ctx.fillStyle="white"; ctx.font="11px sans-serif"; ctx.fillText("#"+(idx+1), x+14, y);
+            p.delete(); dP.delete();
+        });
+    }
+</script>
+</body>
+</html>
